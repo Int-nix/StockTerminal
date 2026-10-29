@@ -1,0 +1,9 @@
+PySide6
+PySide6-Addons
+yfinance
+pandas
+numpy
+requests
+feedparser
+beautifulsoup4
+lxml
