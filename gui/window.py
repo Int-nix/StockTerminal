@@ -15,13 +15,15 @@ from PySide6.QtWidgets import (
     QTableWidget,
     QTableWidgetItem,
     QHeaderView,
-    QAbstractItemView
+    QAbstractItemView,
+    QMessageBox
 )
 
 from config import APP_NAME, APP_VERSION
 from account_session import load_launcher_session
 
 from core.database import Database
+from core.watchlist_sync import AccountWatchlist, WatchlistSyncError
 from core.market import MarketWorker
 
 from gui.dashboard import DashboardMixin
@@ -51,6 +53,14 @@ class StockTerminal(
 
         self.db = Database()
         self.account_session = load_launcher_session()
+        self.account_watchlist = None
+        if self.account_session:
+            self.account_watchlist = AccountWatchlist(self.account_session)
+            try:
+                self.account_watchlist.refresh()
+            except WatchlistSyncError:
+                pass  # Cached account data is available when offline.
+
 
         # One browser manager shared by every StockTerminal page.
         self.browser_launcher = BrowserLauncher(self)
@@ -384,6 +394,11 @@ class StockTerminal(
             remove_button
         )
 
+        if self.account_watchlist:
+            import_button = QPushButton("Import Local Watchlist")
+            import_button.clicked.connect(self.import_local_watchlist)
+            controls.addWidget(import_button)
+
         layout.addLayout(
             controls
         )
@@ -427,11 +442,65 @@ class StockTerminal(
         self.refresh_watchlist_table()
 
     # ==========================================
+    # ACCOUNT WATCHLIST ADAPTER
+    # ==========================================
+
+    def _get_watchlist(self):
+        if self.account_watchlist:
+            return self.account_watchlist.get_watchlist()
+        return self.db.get_watchlist()
+
+    def _add_watchlist(self, ticker):
+        if self.account_watchlist:
+            try:
+                self.account_watchlist.add(ticker)
+            except WatchlistSyncError as exc:
+                QMessageBox.warning(self, "Watchlist sync", str(exc))
+                return False
+        else:
+            self.db.add_watchlist(ticker)
+        return True
+
+    def _remove_watchlist(self, ticker):
+        if self.account_watchlist:
+            try:
+                self.account_watchlist.remove(ticker)
+            except WatchlistSyncError as exc:
+                QMessageBox.warning(self, "Watchlist sync", str(exc))
+                return False
+        else:
+            self.db.remove_watchlist(ticker)
+        return True
+
+    def import_local_watchlist(self):
+        """Explicit one-time import; never silently mix Guest and account stocks."""
+        if not self.account_watchlist:
+            return
+        local = self.db.get_watchlist()
+        if not local:
+            QMessageBox.information(self, "Import watchlist", "No local stocks to import.")
+            return
+        answer = QMessageBox.question(
+            self, "Import local watchlist",
+            f"Merge {len(local)} local stock(s) into your account watchlist? "
+            "Your local watchlist will be kept unchanged.",
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No
+        )
+        if answer != QMessageBox.StandardButton.Yes:
+            return
+        try:
+            self.account_watchlist.merge(local)
+            self.refresh_watchlist_table()
+            self.update_watchlist_button()
+        except WatchlistSyncError as exc:
+            QMessageBox.warning(self, "Import failed", str(exc))
+
+    # ==========================================
     # REFRESH WATCHLIST TABLE
     # ==========================================
 
     def refresh_watchlist_table(self):
-        tickers = self.db.get_watchlist()
+        tickers = self._get_watchlist()
 
         self.watchlist_table.setRowCount(
             len(tickers)
@@ -483,9 +552,8 @@ class StockTerminal(
         if not self.current_ticker:
             return
 
-        self.db.add_watchlist(
-            self.current_ticker
-        )
+        if not self._add_watchlist(self.current_ticker):
+            return
 
         self.update_watchlist_button()
 
@@ -500,7 +568,7 @@ class StockTerminal(
     # ==========================================
 
     def update_watchlist_button(self):
-        tickers = self.db.get_watchlist()
+        tickers = self._get_watchlist()
 
         if self.current_ticker in tickers:
             self.watchlist_button.setText(
@@ -534,9 +602,8 @@ class StockTerminal(
         if not ticker:
             return
 
-        self.db.add_watchlist(
-            ticker
-        )
+        if not self._add_watchlist(ticker):
+            return
 
         self.watchlist_input.clear()
 
@@ -570,9 +637,8 @@ class StockTerminal(
 
         ticker = item.text()
 
-        self.db.remove_watchlist(
-            ticker
-        )
+        if not self._remove_watchlist(ticker):
+            return
 
         self.refresh_watchlist_table()
 
@@ -611,7 +677,7 @@ class StockTerminal(
 
     def refresh_watchlist_prices(self):
         tickers = (
-            self.db.get_watchlist()
+            self._get_watchlist()
         )
 
         if not tickers:
