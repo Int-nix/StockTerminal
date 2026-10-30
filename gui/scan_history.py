@@ -38,9 +38,13 @@ class PriceWorker(QRunnable):
 
 
 class ScanHistory(QWidget):
-    def __init__(self, threadpool, open_stock=None, parent=None):
+    def __init__(self, threadpool, open_stock=None, parent=None, account_session=None):
         super().__init__(parent)
         self.threadpool = threadpool
+        self.cloud = None
+        if account_session:
+            from core.account_cloud import Cloud
+            self.cloud = Cloud(account_session)
         self.open_stock = open_stock
         self.scans = []
         self.results = []
@@ -105,7 +109,15 @@ class ScanHistory(QWidget):
 
     def refresh(self):
         try:
-            self.scans = list_scans()
+            if self.cloud:
+                snapshots = self.cloud.request('GET', '/account/scans')['scans']
+                self._cloud_snapshots = {s['server_id']: s for s in snapshots}
+                self.scans = [dict(id=s['server_id'], started_at=s['started_at'],
+                    mode=s['mode'], exchange=s['exchange'], match_count=len(s['results']),
+                    processed_count=s['processed_count'], universe_count=s['universe_count'],
+                    cancelled=s['cancelled'], error_count=s['error_count']) for s in snapshots]
+            else:
+                self.scans = list_scans()
         except Exception as exc:
             self.info.setText(f"Unable to read scan history: {exc}")
             return
@@ -143,7 +155,8 @@ class ScanHistory(QWidget):
             return
         scan = self.scans[row]
         try:
-            self.results = get_results(scan["id"])
+            self.results = (self._cloud_snapshots[scan['id']]['results']
+                            if self.cloud else get_results(scan['id']))
         except Exception as exc:
             self.details.setText(f"Could not load scan: {exc}")
             return

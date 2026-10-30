@@ -220,7 +220,7 @@ class ScreenerMixin:
         layout.addWidget(self.scan_table)
 
         self.screener_tabs.addTab(scan_page, "Screener")
-        self.scan_history_widget = ScanHistory(self.threadpool, self._open_history_stock)
+        self.scan_history_widget = ScanHistory(self.threadpool, self._open_history_stock, account_session=getattr(self, "account_session", None))
         self.screener_tabs.addTab(self.scan_history_widget, "Scan History")
         self.screener_tabs.currentChanged.connect(self._screener_tab_changed)
         self.pages.addWidget(page)
@@ -753,7 +753,9 @@ class ScreenerMixin:
 
         # Persist the exact worker results, not the rounded/sorted table cells.
         try:
-            saved_id = save_scan(
+            saved_id = None
+            if not getattr(self, "account_session", None):
+                saved_id = save_scan(
                 started_at=self.scan_started_at,
                 mode=self.scan_active_mode,
                 exchange=self.scan_snapshot_filters["exchange"],
@@ -764,7 +766,29 @@ class ScreenerMixin:
                 cancelled=cancelled,
                 results=self.scan_snapshot_results,
             )
-            self.scan_status.setText(self.scan_status.text() + f"  · Saved to history #{saved_id}.")
+            if getattr(self, "account_session", None):
+                import uuid
+                from core.account_cloud import Cloud
+                from core.scan_history import clean
+                from datetime import datetime, timezone
+                payload = {
+                    'client_id': str(uuid.uuid4()),
+                    'started_at': self.scan_started_at,
+                    'finished_at': datetime.now(timezone.utc).isoformat(),
+                    'mode': self.scan_active_mode,
+                    'exchange': self.scan_snapshot_filters['exchange'],
+                    'filters': clean(self.scan_snapshot_filters),
+                    'universe_count': self.scan_universe_count,
+                    'processed_count': done,
+                    'error_count': errors,
+                    'cancelled': bool(cancelled),
+                    'results': clean(self.scan_snapshot_results),
+                }
+                Cloud(self.account_session).request('POST', '/account/scans', payload)
+                self.scan_status.setText(self.scan_status.text() + '  · Synced to account.')
+                self.scan_history_widget.refresh()
+            else:
+                self.scan_status.setText(self.scan_status.text() + f"  · Saved to history #{saved_id}.")
         except Exception as exc:
             self.scan_status.setText(self.scan_status.text() + f"  · HISTORY SAVE FAILED: {exc}")
 

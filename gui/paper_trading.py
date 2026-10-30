@@ -404,10 +404,14 @@ class PortfolioChart(QWidget):
 
 class PaperTradingPage(QWidget):
 
-    def __init__(self, parent=None):
+    def __init__(self, parent=None, account_session=None):
         super().__init__(parent)
 
-        self.engine = PaperTradingEngine()
+        if account_session:
+            from core.cloud_paper import CloudPaperEngine
+            self.engine = CloudPaperEngine(account_session)
+        else:
+            self.engine = PaperTradingEngine()
 
         self.pool = QThreadPool.globalInstance()
 
@@ -1530,7 +1534,7 @@ class PaperTradingPage(QWidget):
 
             self.engine.record_equity()
 
-        except ValueError as error:
+        except (ValueError, RuntimeError) as error:
 
             QMessageBox.warning(
                 self,

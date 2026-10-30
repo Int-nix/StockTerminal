@@ -271,7 +271,7 @@ class StockTerminal(
         # PAPER TRADING — PAGE 6
         # ======================================
 
-        self.paper_trading_page = PaperTradingPage()
+        self.paper_trading_page = PaperTradingPage(account_session=self.account_session)
 
         self.pages.addWidget(
             self.paper_trading_page
