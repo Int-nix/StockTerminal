@@ -1,9 +1,19 @@
 from pathlib import Path
 
 APP_NAME = "StockTerminal"
-APP_VERSION = "0.5.0"
 
 BASE_DIR = Path(__file__).resolve().parent
+
+# Read application version from VERSION file
+VERSION_FILE = BASE_DIR / "VERSION"
+
+try:
+    APP_VERSION = VERSION_FILE.read_text(encoding="utf-8").strip()
+    if not APP_VERSION:
+        raise ValueError("VERSION file is empty")
+except (FileNotFoundError, OSError, ValueError):
+    APP_VERSION = "0.0.0"
+
 DATA_DIR = BASE_DIR / "data"
 DATA_DIR.mkdir(exist_ok=True)
 

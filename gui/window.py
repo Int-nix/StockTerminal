@@ -19,6 +19,7 @@ from PySide6.QtWidgets import (
 )
 
 from config import APP_NAME, APP_VERSION
+from account_session import load_launcher_session
 
 from core.database import Database
 from core.market import MarketWorker
@@ -49,6 +50,7 @@ class StockTerminal(
         super().__init__()
 
         self.db = Database()
+        self.account_session = load_launcher_session()
 
         # One browser manager shared by every StockTerminal page.
         self.browser_launcher = BrowserLauncher(self)
@@ -190,6 +192,19 @@ class StockTerminal(
             )
 
         sidebar_layout.addStretch()
+
+        account_name = (
+            self.account_session["username"]
+            if self.account_session else "Guest"
+        )
+        self.account_label = QLabel(f"Account: {account_name}")
+        self.account_label.setObjectName("Muted")
+        self.account_label.setToolTip(
+            "Signed in through the Windows launcher" if self.account_session
+            else "Local guest mode"
+        )
+        sidebar_layout.addWidget(self.account_label)
+
 
         version = QLabel(
             f"Version {APP_VERSION}"
