@@ -143,10 +143,13 @@ class QuoteWorker(QRunnable):
             try:
                 stock = yf.Ticker(ticker)
 
+                # Use the latest available intraday bar, including
+                # premarket and after-hours where Yahoo supplies it.
                 history = stock.history(
                     period="5d",
-                    interval="1d",
-                    auto_adjust=True
+                    interval="1m",
+                    prepost=True,
+                    auto_adjust=False
                 )
 
                 if history is None or history.empty:
@@ -154,25 +157,16 @@ class QuoteWorker(QRunnable):
                     continue
 
                 closes = history["Close"].dropna()
-
                 if closes.empty:
                     errors.append(ticker)
                     continue
 
-                price = float(
-                    closes.iloc[-1]
-                )
-
-                if (
-                    not math.isfinite(price)
-                    or price <= 0
-                ):
+                price = float(closes.iloc[-1])
+                if not math.isfinite(price) or price <= 0:
                     errors.append(ticker)
                     continue
 
-                quote_time = (
-                    closes.index[-1].isoformat()
-                )
+                quote_time = closes.index[-1].isoformat()
 
                 results[ticker] = {
                     "price": price,
@@ -425,6 +419,7 @@ class PaperTradingPage(QWidget):
         self.build_ui()
 
         self.refresh()
+        self.refresh_prices()
 
     # ========================================================
     # UI HELPERS
@@ -1039,7 +1034,7 @@ class PaperTradingPage(QWidget):
 
         notice = QLabel(
             "Simulated orders use the latest available "
-            "daily closing price. Actual market fills "
+            "intraday quote when available. Actual market fills "
             "may differ. No real trades are placed."
         )
 
@@ -1434,11 +1429,11 @@ class PaperTradingPage(QWidget):
             return
 
         self.trade_price.setText(
-            f"Latest daily close: {money(price)}"
+            f"Latest available quote: {money(price)}"
         )
 
         self.quote_date.setText(
-            "Quote date: "
+            "Latest bar time: "
             + format_time(
                 self.quote_times.get(ticker)
             )
@@ -1510,7 +1505,7 @@ class PaperTradingPage(QWidget):
             f"Quote date: {format_time(quote_time)}\n"
             f"Estimated total: {money(total)}\n\n"
             "This is a virtual trade using "
-            "the latest available daily close.",
+            "the latest available quote (which may be delayed).",
             QMessageBox.Yes | QMessageBox.No,
             QMessageBox.No
         )

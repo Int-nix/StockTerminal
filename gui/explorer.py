@@ -910,7 +910,14 @@ class ExplorerMixin:
         self.explorer_stats["fifty_two_high"].setText(number("fiftyTwoWeekHigh"))
         self.explorer_stats["fifty_two_low"].setText(number("fiftyTwoWeekLow"))
         self.explorer_stats["eps"].setText(number("trailingEps"))
-        self.explorer_stats["dividend_yield"].setText(percent("dividendYield"))
+        dividend_yield = valid_number(info.get("dividendYield"))
+
+        if dividend_yield is not None:
+            self.explorer_stats["dividend_yield"].setText(
+                f"{dividend_yield:.2f}%"
+            )
+        else:
+            self.explorer_stats["dividend_yield"].setText("--")
         self.explorer_stats["beta"].setText(number("beta"))
         self.explorer_stats["revenue"].setText(format_market_cap(info.get("totalRevenue")))
         self.explorer_stats["profit_margin"].setText(percent("profitMargins"))
