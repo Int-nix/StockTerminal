@@ -830,20 +830,22 @@ class ExplorerMixin:
 
     def refresh_explorer_quote(self):
         ticker = self.explorer_requested_ticker
-        if not ticker or self.explorer_quote_worker is not None:
+        if not ticker:
             return
-        # Applies to US/Canadian stocks. Other exchanges need exchange calendars.
-        if not self._explorer_market_open():
-            self.explorer_price_note.setText(
-                "Regular US/Canada session closed · latest available quote may be delayed")
+
+        if self.explorer_quote_worker is not None:
             return
+
         worker = QuoteWorker(ticker)
         self.explorer_quote_worker = worker
         self.explorer_quote_ticker = ticker
+
         worker.signals.finished.connect(
-            lambda data, w=worker: self._explorer_quote_loaded(data, w))
+            lambda data, w=worker: self._explorer_quote_loaded(data, w)
+        )
         worker.signals.error.connect(
-            lambda error, w=worker: self._explorer_quote_error(error, w))
+            lambda error, w=worker: self._explorer_quote_error(error, w)
+        )
         self.threadpool.start(worker)
 
     def _explorer_quote_loaded(self, data, worker):
@@ -1180,19 +1182,14 @@ class ExplorerMixin:
             info.get("currency")
             or "USD"
         )
+    # Historical prices are for the chart, not the live quote.
+# Wait for QuoteWorker before displaying a market price.
+        self.price_value.setText("Loading latest quote...")
+        self.price_change.setText("--")
 
-        if latest is not None:
-
-            self.price_value.setText(
-                f"{latest:,.2f} {currency}"
-            )
-
-        else:
-
-            self.price_value.setText(
-                "Price unavailable"
-            )
-
+        self.explorer_price_note.setText(
+            "Retrieving latest available market price..."
+        )
         # ----------------------------------------------------
         # PRICE CHANGE
         # ----------------------------------------------------
@@ -1200,33 +1197,13 @@ class ExplorerMixin:
         change = calculate_price_change(
             clean_history
         )
+        self.update_watchlist_button()
 
-        if change is not None:
+        self.statusBar().showMessage(
+            f"{ticker} loaded successfully"
+        )
 
-            color = (
-                COLORS["green"]
-                if change >= 0
-                else COLORS["red"]
-            )
-
-            self.price_change.setText(
-                f"{change:+.2f}%"
-            )
-
-            self.price_change.setStyleSheet(
-                f"color: {color};"
-            )
-
-        else:
-
-            self.price_change.setText(
-                "--"
-            )
-
-            self.price_change.setStyleSheet(
-                "color: #94A3B8;"
-            )
-
+        self.refresh_explorer_quote()
         # ----------------------------------------------------
         # MARKET CAPITALIZATION
         # ----------------------------------------------------
@@ -1326,6 +1303,9 @@ class ExplorerMixin:
         self.statusBar().showMessage(
             f"{ticker} loaded successfully"
         )
+
+# Immediately request the latest available market quote.
+        self.refresh_explorer_quote()
 
     # ========================================================
     # STOCK ERROR
