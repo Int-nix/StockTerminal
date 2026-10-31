@@ -129,113 +129,163 @@ class StockTerminal(
         main_layout.setSpacing(0)
 
         # ======================================
-        # SIDEBAR
+        # STOCKTERMINAL NAVIGATION / SIDEBAR
         # ======================================
-
         self.sidebar = QFrame()
+        self.sidebar.setObjectName("Sidebar")
+        self.sidebar.setFixedWidth(244)
+        self.sidebar.setStyleSheet("""
+            QFrame#Sidebar {
+                background-color: #0a1423;
+                border: none;
+                border-right: 1px solid #22364d;
+            }
+            QFrame#Sidebar QLabel#BrandTitle {
+                color: #f3f7ff; font-size: 17px; font-weight: 800;
+                background: transparent; border: none;
+            }
+            QFrame#Sidebar QLabel#BrandSubtitle {
+                color: #6f90b7; font-size: 10px; letter-spacing: 1px;
+                background: transparent; border: none;
+            }
+            QFrame#Sidebar QLabel#NavSection {
+                color: #7189a9; font-size: 10px; font-weight: 700;
+                padding: 12px 10px 5px 10px; background: transparent;
+                border: none;
+            }
+            QFrame#Sidebar QPushButton#Navigation {
+                color: #a8bed8; background-color: transparent;
+                border: 1px solid transparent; border-radius: 9px;
+                padding: 12px 12px; text-align: left;
+                font-size: 12px; font-weight: 600;
+            }
+            QFrame#Sidebar QPushButton#Navigation:hover {
+                color: #f1f6ff; background-color: #172b45;
+                border-color: #263d5b;
+            }
+            QFrame#Sidebar QPushButton#Navigation:checked {
+                color: #ffffff; background-color: #194a8a;
+                border: 1px solid #3277cf;
+            }
+            QFrame#Sidebar QFrame#AccountPanel {
+                background-color: #101f33; border: 1px solid #243951;
+                border-radius: 10px;
+            }
+            QFrame#Sidebar QLabel#AccountName {
+                color: #f0f5ff; font-weight: 700; font-size: 12px;
+                background: transparent; border: none;
+            }
+            QFrame#Sidebar QLabel#AccountMeta {
+                color: #829bb8; font-size: 10px;
+                background: transparent; border: none;
+            }
+            QFrame#Sidebar QPushButton#SidebarToggle {
+                background: #152840; color: #a7c5e9;
+                border: 1px solid #2b4462; border-radius: 7px;
+                padding: 6px; font-weight: 700;
+            }
+            QFrame#Sidebar QPushButton#SidebarToggle:hover {
+                background: #22456d; color: white;
+            }
+        """)
+        sidebar_layout = QVBoxLayout(self.sidebar)
+        sidebar_layout.setContentsMargins(13, 18, 13, 16)
+        sidebar_layout.setSpacing(5)
 
-        self.sidebar.setObjectName(
-            "Sidebar"
+        brand_row = QHBoxLayout()
+        brand_icon = QLabel("ST")
+        brand_icon.setAlignment(Qt.AlignCenter)
+        brand_icon.setFixedSize(38, 38)
+        brand_icon.setStyleSheet(
+            "background:#1e5db3; color:white; border-radius:10px;"
+            "font-size:15px; font-weight:900;"
         )
+        brand_row.addWidget(brand_icon)
+        brand_text = QWidget()
+        brand_text_layout = QVBoxLayout(brand_text)
+        brand_text_layout.setContentsMargins(7, 0, 0, 0)
+        brand_text_layout.setSpacing(1)
+        logo = QLabel("STOCKTERMINAL")
+        logo.setObjectName("BrandTitle")
+        tagline = QLabel("MARKET INTELLIGENCE")
+        tagline.setObjectName("BrandSubtitle")
+        brand_text_layout.addWidget(logo)
+        brand_text_layout.addWidget(tagline)
+        brand_row.addWidget(brand_text, 1)
+        sidebar_layout.addLayout(brand_row)
+        sidebar_layout.addSpacing(26)
 
-        self.sidebar.setFixedWidth(
-            220
-        )
-
-        sidebar_layout = QVBoxLayout(
-            self.sidebar
-        )
-
-        sidebar_layout.setContentsMargins(
-            15, 25, 15, 20
-        )
-
-        sidebar_layout.setSpacing(8)
-
-        logo = QLabel(
-            "STOCK TERMINAL"
-        )
-
-        logo.setStyleSheet(
-            "font-size: 19px;"
-            "font-weight: bold;"
-            "color: #60A5FA;"
-        )
-
-        sidebar_layout.addWidget(
-            logo
-        )
-
-        sidebar_layout.addSpacing(
-            30
-        )
-
-        # ======================================
-        # PAGE STACK
-        # ======================================
-
+        # Page indices match the order in which pages are built below.
         self.pages = QStackedWidget()
-
-        navigation = [
-            ("Dashboard", 0),
-            ("Stock Explorer", 1),
-            ("Stock Screener", 2),
-            ("News Research", 3),
-            ("Watchlist", 4),
-            ("Paper Trading", 5)
+        self.nav_buttons = {}
+        self.nav_sections = []
+        self.nav_labels = {}
+        navigation_sections = [
+            ("WORKSPACE", [
+                ("Dashboard", "▦", 0),
+                ("Stock Explorer", "⌕", 1),
+                ("Stock Screener", "▤", 2),
+                ("News Research", "◫", 3),
+            ]),
+            ("PORTFOLIO", [
+                ("Watchlist", "☆", 4),
+                ("Paper Trading", "◈", 5),
+            ]),
         ]
+        for section_name, entries in navigation_sections:
+            section_label = QLabel(section_name)
+            section_label.setObjectName("NavSection")
+            sidebar_layout.addWidget(section_label)
+            self.nav_sections.append(section_label)
+            for name, symbol, index in entries:
+                button = QPushButton(f"{symbol}    {name}")
+                button.setObjectName("Navigation")
+                button.setCheckable(True)
+                button.setCursor(Qt.PointingHandCursor)
+                button.setMinimumHeight(43)
+                button.setToolTip(name)
+                button.clicked.connect(
+                    lambda checked=False, i=index: self.change_page(i)
+                )
+                sidebar_layout.addWidget(button)
+                self.nav_buttons[index] = button
+                self.nav_labels[index] = (name, symbol)
 
-        for name, index in navigation:
-            button = QPushButton(name)
-
-            button.setObjectName(
-                "Navigation"
-            )
-
-            button.clicked.connect(
-                lambda checked=False, i=index:
-                self.change_page(i)
-            )
-
-            sidebar_layout.addWidget(
-                button
-            )
-
-        sidebar_layout.addStretch()
+        self.nav_buttons[0].setChecked(True)
+        sidebar_layout.addStretch(1)
 
         account_name = (
             self.account_session["username"]
             if self.account_session else "Guest"
         )
-        self.account_label = QLabel(f"Account: {account_name}")
-        self.account_label.setObjectName("Muted")
+        account_panel = QFrame()
+        account_panel.setObjectName("AccountPanel")
+        account_layout = QVBoxLayout(account_panel)
+        account_layout.setContentsMargins(12, 10, 12, 10)
+        account_layout.setSpacing(4)
+        self.account_label = QLabel(account_name)
+        self.account_label.setObjectName("AccountName")
         self.account_label.setToolTip(
-            "Signed in through the Windows launcher" if self.account_session
-            else "Local guest mode"
+            "Signed in through the Windows launcher"
+            if self.account_session else "Local guest mode"
         )
-        sidebar_layout.addWidget(self.account_label)
+        account_layout.addWidget(self.account_label)
+        version = QLabel(f"{'CONNECTED ACCOUNT' if self.account_session else 'LOCAL SESSION'}  ·  v{APP_VERSION}")
+        version.setObjectName("AccountMeta")
+        account_layout.addWidget(version)
+        sidebar_layout.addWidget(account_panel)
 
+        self.sidebar_toggle = QPushButton("◀  Collapse sidebar")
+        self.sidebar_toggle.setObjectName("SidebarToggle")
+        self.sidebar_toggle.setCursor(Qt.PointingHandCursor)
+        self.sidebar_toggle.clicked.connect(self.toggle_sidebar)
+        sidebar_layout.addWidget(self.sidebar_toggle)
+        self.sidebar_brand_text = brand_text
+        self.sidebar_account_panel = account_panel
+        self.sidebar_collapsed = False
 
-        version = QLabel(
-            f"Version {APP_VERSION}"
-        )
-
-        version.setObjectName(
-            "Muted"
-        )
-
-        sidebar_layout.addWidget(
-            version
-        )
-
-        main_layout.addWidget(
-            self.sidebar
-        )
-
-        main_layout.addWidget(
-            self.pages,
-            1
-        )
+        main_layout.addWidget(self.sidebar)
+        main_layout.addWidget(self.pages, 1)
 
         # ======================================
         # BUILD APPLICATION PAGES
@@ -303,8 +353,27 @@ class StockTerminal(
     # NAVIGATION
     # ==========================================
 
+    def toggle_sidebar(self):
+        """Collapse to icons or restore the full navigation labels."""
+        self.sidebar_collapsed = not self.sidebar_collapsed
+        collapsed = self.sidebar_collapsed
+        self.sidebar.setFixedWidth(70 if collapsed else 244)
+        self.sidebar_brand_text.setVisible(not collapsed)
+        self.sidebar_account_panel.setVisible(not collapsed)
+        for label in self.nav_sections:
+            label.setVisible(not collapsed)
+        for index, button in self.nav_buttons.items():
+            name, symbol = self.nav_labels[index]
+            button.setText(symbol if collapsed else f"{symbol}    {name}")
+            button.setStyleSheet(
+                "text-align: center; padding: 10px 2px;" if collapsed else ""
+            )
+        self.sidebar_toggle.setText("▶" if collapsed else "◀  Collapse sidebar")
+
     def change_page(self, index):
         self.pages.setCurrentIndex(index)
+        for page_index, button in self.nav_buttons.items():
+            button.setChecked(page_index == index)
 
         if index == 1:
             self.explorer_analysis_tab_changed(
